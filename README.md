@@ -1,6 +1,6 @@
 # covid-volunteers
 
-[![CircleCI build status](https://img.shields.io/cirrus/github/sradu/covid-volunteers?style=plastic)](https://circleci.com/gh/sradu/covid-volunteers)
+[![CircleCI build status](https://img.shields.io/cirrus/github/helpwithcovid/covid-volunteers?style=plastic)](https://circleci.com/gh/helpwithcovid/covid-volunteers)
 
 This repository stores the code for the https://helpwithcovid.com/ website.
 
@@ -36,6 +36,16 @@ Setup the database and seed data:
 ```
 rails db:setup
 ```
+
+## Configuration
+
+The following environment variables can be set:
+
+| Environment variable  | Type of value                      | Description                                              |
+|-----------------------|------------------------------------|----------------------------------------------------------|
+| `ADMINS`              | Email addresses separated by a `,` | Gives admin permissions to the listed accounts           |
+| `EXCEPTION_NOTIFIERS` | Email addresses separated by a `,` | Sends technical exceptions to the listed email addresses |
+| `EMAIL_ADDRESS`       | Single email address               | Used to contact your team                                |
 
 ## Launch app
 

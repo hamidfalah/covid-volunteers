@@ -1,26 +1,15 @@
 class ProjectsController < ApplicationController
-  before_action :authenticate_user!, only: [ :new, :create, :edit, :update, :destroy, :toggle_volunteer, :volunteered, :own ]
-  before_action :set_project, only: [ :show, :edit, :update, :destroy, :toggle_volunteer ]
-  before_action :ensure_owner_or_admin, only: [ :edit, :update, :destroy ]
-
-  before_action :authenticate_user!, :ensure_owner_or_admin,
-    only: [:show],
-    if: Proc.new { |c| c.request.format.csv? }
+  before_action :authenticate_user!, only: [ :new, :create, :edit, :update, :destroy, :toggle_volunteer, :volunteered, :own, :volunteers ]
+  before_action :set_project, only: [ :show, :edit, :update, :destroy, :toggle_volunteer, :volunteers ]
+  before_action :ensure_owner_or_admin, only: [ :edit, :update, :destroy, :volunteers ]
+  before_action :set_filters_open, only: :index
+  before_action :set_projects_query, only: :index
 
   def index
     params[:page] ||= 1
-    @show_filter = true
+    @show_filters = true
     @show_search_bar = true
-
-    filtered_projects = Project
-    filtered_projects = filtered_projects.tagged_with(params[:skill]) if params[:skill].present?
-    filtered_projects = filtered_projects.tagged_with(params[:project_type]) if params[:project_type].present?
-    if params[:query].present?
-      grouped_projects = filtered_projects.search(params[:query]).left_joins(:volunteers).reorder(nil).group(:id)
-    else
-      grouped_projects = filtered_projects.left_joins(:volunteers).group(:id)
-    end
-    @projects = grouped_projects.includes(:project_types, :skills).order('highlight DESC, COUNT(volunteers.id) DESC, created_at DESC')
+    @show_sorting_options = true
 
     respond_to do |format|
       format.html do
@@ -70,8 +59,13 @@ class ProjectsController < ApplicationController
   def show
     respond_to do |format|
       format.html
-      format.csv { send_data @project.volunteered_users.to_csv, filename: "volunteers-#{Date.today}.csv" }
       format.json { render json: @project }
+    end
+  end
+
+  def volunteers
+    respond_to do |format|
+      format.csv { send_data @project.volunteered_users.to_csv, filename: "volunteers-#{Date.today}.csv" }
     end
   end
 
@@ -141,7 +135,7 @@ class ProjectsController < ApplicationController
 
     # Only allow a list of trusted parameters through.
     def project_params
-      params.fetch(:project, {}).permit(:name, :description, :participants, :looking_for, :contact, :location, :progress, :docs_and_demo, :number_of_volunteers, :skill_list => [], :project_type_list => [])
+      params.fetch(:project, {}).permit(:name, :description, :participants, :looking_for, :contact, :location, :progress, :docs_and_demo, :number_of_volunteers, :links, :skill_list => [], :project_type_list => [])
     end
 
     def ensure_owner_or_admin
@@ -149,5 +143,33 @@ class ProjectsController < ApplicationController
         flash[:error] = "Apologies, you don't have access to this."
         redirect_to projects_path
       end
+    end
+
+    def set_projects_query
+      applied_skills = (params[:skills] or '').split(',')
+      applied_project_types = (params[:project_types] or '').split(',')
+
+      @projects = Project
+      @projects = @projects.tagged_with(applied_skills) if applied_skills.length > 0
+      @projects = @projects.tagged_with(applied_project_types) if applied_project_types.length > 0
+
+      if params[:query].present?
+        @projects = @projects.search(params[:query]).left_joins(:volunteers).reorder(nil).group(:id)
+      else
+        @projects = @projects.left_joins(:volunteers).group(:id)
+      end
+
+      if params[:sort_by]
+        @projects = @projects.order(get_order_param)
+      else
+        @projects = @projects.order('highlight DESC, COUNT(volunteers.id) DESC, created_at DESC')
+      end
+
+      @projects = @projects.includes(:project_types, :skills)
+    end
+
+    def get_order_param
+      return 'created_at desc' if params[:sort_by] == 'latest'
+      return 'volunteers.count asc' if params[:sort_by] == 'volunteers_needed'
     end
 end
